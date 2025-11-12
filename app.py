@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from io import BytesIO
 import base64
@@ -7,6 +8,19 @@ import httpx
 from playwright.async_api import async_playwright
 
 app = FastAPI(title="HTML to PDF API", description="API para convertir páginas HTML a PDF")
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://emotive.g3nia.com",
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class HTMLRequest(BaseModel):
