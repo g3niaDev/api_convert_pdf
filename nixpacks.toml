@@ -1,12 +1,13 @@
 [phases.setup]
 nixPkgs = ["python311"]
 
-# Nixpacks instala automáticamente requirements.txt
-# Luego instalamos los navegadores de Playwright usando el path del entorno virtual
-[phases.install]
+# Nixpacks instala automáticamente requirements.txt en la fase install
+# Instalamos los navegadores de Playwright en la fase build (después de install)
+# Usamos el PATH que Nixpacks configura para el entorno virtual
+[phases.build]
 cmds = [
-  "/opt/venv/bin/python -m playwright install chromium",
-  "/opt/venv/bin/python -m playwright install-deps chromium"
+  "playwright install chromium",
+  "playwright install-deps chromium"
 ]
 
 [start]
