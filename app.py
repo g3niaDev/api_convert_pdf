@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from weasyprint import HTML
 from io import BytesIO
 import base64
 import httpx
@@ -41,16 +40,49 @@ async def root():
 @app.post("/convert")
 async def convert_html_to_pdf(request: HTMLRequest):
     """
-    Convierte contenido HTML a PDF.
+    Convierte contenido HTML a PDF usando Playwright.
     
     Recibe el HTML en el campo 'html_content' y retorna el PDF como respuesta.
     """
     try:
-        # Convertir HTML a PDF usando weasyprint
-        html = HTML(string=request.html_content)
-        pdf_bytes = html.write_pdf()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            
+            # Cargar el HTML usando data URL
+            html_encoded = base64.b64encode(request.html_content.encode('utf-8')).decode('utf-8')
+            data_url = f"data:text/html;base64,{html_encoded}"
+            
+            await page.goto(data_url, wait_until="networkidle", timeout=30000)
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_timeout(2000)
+            
+            # Obtener dimensiones del contenido
+            dimensions = await page.evaluate("""
+                () => {
+                    const body = document.body;
+                    const html = document.documentElement;
+                    return {
+                        width: Math.ceil(Math.max(body.scrollWidth, html.scrollWidth)),
+                        height: Math.ceil(Math.max(body.scrollHeight, html.scrollHeight))
+                    };
+                }
+            """)
+            
+            await page.set_viewport_size({'width': dimensions['width'], 'height': dimensions['height']})
+            await page.wait_for_timeout(500)
+            
+            # Generar PDF
+            pdf_bytes = await page.pdf(
+                width=f"{dimensions['width'] / 96.0}in",
+                height=f"{(dimensions['height'] / 96.0) + 0.2}in",
+                margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+                print_background=True,
+                prefer_css_page_size=False
+            )
+            
+            await browser.close()
         
-        # Retornar el PDF como respuesta
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -65,7 +97,7 @@ async def convert_html_to_pdf(request: HTMLRequest):
 @app.post("/convert-base64")
 async def convert_html_base64_to_pdf(request: HTMLBase64Request):
     """
-    Convierte contenido HTML (codificado en base64) a PDF.
+    Convierte contenido HTML (codificado en base64) a PDF usando Playwright.
     
     Recibe el HTML codificado en base64 en el campo 'html_base64' y retorna el PDF como respuesta.
     """
@@ -73,11 +105,44 @@ async def convert_html_base64_to_pdf(request: HTMLBase64Request):
         # Decodificar el HTML desde base64
         html_content = base64.b64decode(request.html_base64).decode('utf-8')
         
-        # Convertir HTML a PDF usando weasyprint
-        html = HTML(string=html_content)
-        pdf_bytes = html.write_pdf()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            
+            # Cargar el HTML usando data URL
+            html_encoded = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
+            data_url = f"data:text/html;base64,{html_encoded}"
+            
+            await page.goto(data_url, wait_until="networkidle", timeout=30000)
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_timeout(2000)
+            
+            # Obtener dimensiones del contenido
+            dimensions = await page.evaluate("""
+                () => {
+                    const body = document.body;
+                    const html = document.documentElement;
+                    return {
+                        width: Math.ceil(Math.max(body.scrollWidth, html.scrollWidth)),
+                        height: Math.ceil(Math.max(body.scrollHeight, html.scrollHeight))
+                    };
+                }
+            """)
+            
+            await page.set_viewport_size({'width': dimensions['width'], 'height': dimensions['height']})
+            await page.wait_for_timeout(500)
+            
+            # Generar PDF
+            pdf_bytes = await page.pdf(
+                width=f"{dimensions['width'] / 96.0}in",
+                height=f"{(dimensions['height'] / 96.0) + 0.2}in",
+                margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+                print_background=True,
+                prefer_css_page_size=False
+            )
+            
+            await browser.close()
         
-        # Retornar el PDF como respuesta
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

@@ -1,15 +1,5 @@
 [phases.setup]
-nixPkgs = [
-  "python311",
-  "glib",
-  "pango",
-  "gobject-introspection",
-  "cairo",
-  "libffi",
-  "gdk-pixbuf",
-  "shared-mime-info",
-  "gtk3"
-]
+nixPkgs = ["python311"]
 
 [phases.build]
 cmds = [
