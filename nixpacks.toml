@@ -6,6 +6,7 @@ nixPkgs = ["python311"]
 # Use 'python -m playwright' en lugar de 'playwright' para asegurar que se ejecuta 
 # a través del módulo de Python que ya está instalado en su entorno.
 cmds = [
+  "pip install -r requirements.txt",
   "python -m playwright install chromium",
   "python -m playwright install-deps chromium"
 ]
