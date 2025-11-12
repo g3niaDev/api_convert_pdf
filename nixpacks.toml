@@ -1,5 +1,14 @@
 [phases.setup]
-nixPkgs = ["python311"]
+# Python y dependencias del sistema para WeasyPrint
+nixPkgs = [
+  "python311",
+  "pango",
+  "gobject-introspection",
+  "cairo",
+  "libffi",
+  "gdk-pixbuf",
+  "shared-mime-info"
+]
 
 # Nixpacks instala automáticamente requirements.txt en la fase install
 # Instalamos los navegadores de Playwright en la fase build (después de install)
