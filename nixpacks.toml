@@ -2,22 +2,27 @@
 # Python y dependencias del sistema para WeasyPrint
 nixPkgs = [
   "python311",
+  "glib",  # Contiene libgobject-2.0
   "pango",
   "gobject-introspection",
   "cairo",
   "libffi",
   "gdk-pixbuf",
-  "shared-mime-info"
+  "shared-mime-info",
+  "gtk3"  # GTK3 incluye más dependencias necesarias
 ]
 
 # Nixpacks instala automáticamente requirements.txt en la fase install
 # Instalamos los navegadores de Playwright en la fase build (después de install)
-# Usamos el PATH que Nixpacks configura para el entorno virtual
+# Configurar variables de entorno para que WeasyPrint encuentre las librerías
 [phases.build]
 cmds = [
   "playwright install chromium",
   "playwright install-deps chromium"
 ]
+env = {
+  "LD_LIBRARY_PATH" = "${LD_LIBRARY_PATH}:/nix/store/*-glib-*/lib:/nix/store/*-pango-*/lib:/nix/store/*-cairo-*/lib:/nix/store/*-gobject-introspection-*/lib"
+}
 
 [start]
-cmd = "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"
+cmd = "./start.sh"
