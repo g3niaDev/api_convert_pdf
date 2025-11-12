@@ -3,11 +3,12 @@ nixPkgs = ["python311"]
 
 # Nixpacks instala automáticamente requirements.txt, solo necesitamos agregar Playwright
 [phases.install]
+# Use 'python -m playwright' en lugar de 'playwright' para asegurar que se ejecuta 
+# a través del módulo de Python que ya está instalado en su entorno.
 cmds = [
-  "playwright install chromium",
-  "playwright install-deps chromium"
+  "python -m playwright install chromium",
+  "python -m playwright install-deps chromium"
 ]
 
 [start]
 cmd = "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"
-
