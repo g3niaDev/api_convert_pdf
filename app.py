@@ -32,17 +32,14 @@ except ImportError as e:
 
 app = FastAPI(title="HTML to PDF API", description="API para convertir páginas HTML a PDF")
 
-# Configurar CORS
+# Configurar CORS - Permitir todas las peticiones HTTP y HTTPS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://emotive.g3nia.com",
-        "http://localhost:3000",
-        "http://localhost:8000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Permitir todos los orígenes (HTTP y HTTPS)
+    allow_credentials=False,  # Debe ser False cuando allow_origins=["*"]
+    allow_methods=["*"],  # Permitir todos los métodos HTTP
+    allow_headers=["*"],  # Permitir todos los headers
+    expose_headers=["*"],  # Exponer todos los headers en la respuesta
 )
 
 
