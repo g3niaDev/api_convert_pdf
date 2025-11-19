@@ -2,13 +2,25 @@
 
 Esta guía explica cómo integrar la API de conversión HTML a PDF desde una aplicación PHP.
 
-## Endpoint Disponible
+## Endpoints Disponibles
 
+### 1. `/convert-url`
 **URL del endpoint:** `http://127.0.0.1:8080/convert-url`
 
 **Método:** `POST`
 
 **Content-Type:** `application/json`
+
+Convierte una página web a PDF en una sola página.
+
+### 2. `/convert-url-a4` (NUEVO)
+**URL del endpoint:** `http://127.0.0.1:8080/convert-url-a4`
+
+**Método:** `POST`
+
+**Content-Type:** `application/json`
+
+Convierte una página web a PDF dividiéndola automáticamente en múltiples páginas A4. El número de páginas se calcula automáticamente según el tamaño de la página.
 
 ## Formato de la Petición
 
@@ -195,7 +207,7 @@ use Illuminate\Support\Facades\Log;
 class ReporteController extends Controller
 {
     /**
-     * Genera un PDF del reporte
+     * Genera un PDF del reporte (una sola página)
      */
     public function generarPDF(Request $request)
     {
@@ -237,15 +249,80 @@ class ReporteController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'attachment; filename="reporte.pdf"');
     }
+
+    /**
+     * Genera un PDF del reporte dividido en múltiples páginas A4
+     * IMPORTANTE: Este método hace una petición HTTP externa a la API FastAPI
+     * NO es una ruta de Laravel, es una llamada a un servicio externo
+     */
+    public function generarPDFA4(Request $request)
+    {
+        $formularioId = $request->input('formulario_id');
+        $usuarioId = $request->input('usuario_id');
+        
+        // Construir la URL del reporte
+        $url = url("/meurelatorio/pdf?formulario_id={$formularioId}&usuario_id={$usuarioId}");
+        
+        // URL de la API PDF - IMPORTANTE: Esta es la URL del servicio FastAPI externo
+        $apiUrl = env('PDF_API_URL', 'http://127.0.0.1:8080') . '/convert-url-a4';
+        
+        // Preparar la petición
+        $data = json_encode(['url' => $url]);
+        
+        $ch = curl_init($apiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($data)
+            ],
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_TIMEOUT => 120, // Timeout más largo para páginas grandes
+        ]);
+        
+        $pdf = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error || $httpCode !== 200) {
+            Log::error("Error al generar PDF A4: " . ($error ?: "HTTP $httpCode"));
+            return response()->json(['error' => 'Error al generar el PDF'], 500);
+        }
+        
+        return response($pdf, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="reporte_a4.pdf"');
+    }
 }
 ```
 
+### Configuración de Rutas en Laravel
+
+**IMPORTANTE:** El endpoint `/convert-url-a4` NO debe definirse como una ruta de Laravel. Es un servicio externo (FastAPI) al que debes hacer peticiones HTTP.
+
+Si necesitas crear una ruta en Laravel que llame a este servicio, hazlo así en `routes/web.php` o `routes/api.php`:
+
+```php
+// routes/api.php o routes/web.php
+
+use App\Http\Controllers\ReporteController;
+
+// Ruta que llama al servicio externo FastAPI
+Route::post('/convert-url-a4', [ReporteController::class, 'generarPDFA4']);
+```
+
+Esta ruta de Laravel recibirá la petición y luego hará una petición HTTP externa a la API FastAPI en `http://127.0.0.1:8080/convert-url-a4`.
+
 ## Ejemplo Completo: Función PHP Simple
+
+### Función para PDF de una sola página
 
 ```php
 <?php
 /**
- * Genera un PDF desde una URL y lo descarga
+ * Genera un PDF desde una URL y lo descarga (una sola página)
  */
 function descargarPDF($formularioId, $usuarioId) {
     // Construir la URL del reporte
@@ -296,6 +373,72 @@ function descargarPDF($formularioId, $usuarioId) {
 
 // Ejemplo de uso
 if (isset($_GET['formulario_id']) && isset($_GET['usuario_id'])) {
+    descargarPDF($_GET['formulario_id'], $_GET['usuario_id']);
+} else {
+    echo "Faltan parámetros: formulario_id y usuario_id";
+}
+?>
+```
+
+### Función para PDF dividido en múltiples páginas A4
+
+```php
+<?php
+/**
+ * Genera un PDF desde una URL dividido en múltiples páginas A4
+ * IMPORTANTE: Hace una petición HTTP externa a la API FastAPI
+ */
+function descargarPDFA4($formularioId, $usuarioId) {
+    // Construir la URL del reporte
+    $urlReporte = "http://localhost:8000/meurelatorio/pdf?formulario_id={$formularioId}&usuario_id={$usuarioId}";
+    
+    // URL de la API PDF - Servicio externo FastAPI
+    $apiUrl = "http://127.0.0.1:8080/convert-url-a4";
+    
+    // Preparar los datos JSON
+    $data = json_encode([
+        'url' => $urlReporte
+    ]);
+    
+    // Inicializar cURL
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $apiUrl);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($data)
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Timeout más largo para páginas grandes
+    
+    // Ejecutar la petición
+    $pdfContent = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    // Verificar si hubo errores
+    if ($error) {
+        die("Error en la petición: " . $error);
+    }
+    
+    if ($httpCode !== 200) {
+        die("Error HTTP: " . $httpCode);
+    }
+    
+    // Enviar el PDF al navegador
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="reporte_a4_' . $formularioId . '_' . $usuarioId . '.pdf"');
+    header('Content-Length: ' . strlen($pdfContent));
+    echo $pdfContent;
+    exit;
+}
+
+// Ejemplo de uso
+if (isset($_GET['formulario_id']) && isset($_GET['usuario_id']) && isset($_GET['tipo']) && $_GET['tipo'] === 'a4') {
+    descargarPDFA4($_GET['formulario_id'], $_GET['usuario_id']);
+} elseif (isset($_GET['formulario_id']) && isset($_GET['usuario_id'])) {
     descargarPDF($_GET['formulario_id'], $_GET['usuario_id']);
 } else {
     echo "Faltan parámetros: formulario_id y usuario_id";
